@@ -1,0 +1,56 @@
+===============================================
+QUICK SETUP - macOS VNC via GitHub Actions
+===============================================
+
+STEPS TO COMPLETE:
+
+1. CREATE GITHUB REPOSITORY
+   - Go to: https://github.com/new
+   - Repository name: macos-vnc-access
+   - Make it PUBLIC (required for free GitHub Actions)
+   - Click "Create repository"
+
+2. PUSH CODE TO GITHUB
+   Run these commands in PowerShell:
+
+   cd "d:\dilip aws"
+   git remote add origin https://github.com/YOUR_USERNAME/macos-vnc-access.git
+   git push -u origin master
+
+   (Replace YOUR_USERNAME with your actual GitHub username)
+
+3. RUN THE WORKFLOW
+   - Go to: https://github.com/YOUR_USERNAME/macos-vnc-access/actions
+   - Click "macOS VNC Access" workflow
+   - Click "Run workflow" > "Run workflow"
+   - Click on the running workflow to see logs
+
+4. GET VNC CONNECTION DETAILS
+   In the workflow logs, look for:
+   ============================================
+   VNC ACCESS DETAILS
+   ============================================
+   VNC URL: tcp://X.tcp.ngrok.io:XXXXX
+   Password: Dilip@2026
+   Username: runner
+
+5. CONNECT TO macOS
+   - Download VNC Viewer: https://www.realvnc.com/download/viewer/
+   - Open VNC Viewer
+   - Enter the ngrok URL (e.g., X.tcp.ngrok.io:XXXXX)
+   - Use password: Dilip@2026
+
+OPTIONAL - Better Performance:
+   - Sign up at https://ngrok.com (free)
+   - Get authtoken from: https://dashboard.ngrok.com/get-started/your-authtoken
+   - Add to GitHub Secrets:
+     * Go to: https://github.com/YOUR_USERNAME/macos-vnc-access/settings/secrets/actions/new
+     * Name: NGROK_AUTH_TOKEN
+     * Value: [your token]
+
+===============================================
+
+The macOS session will stay alive for up to 6 hours!
+
+All files are ready in d:\dilip aws\
+Just need to push to GitHub and run the workflow.
