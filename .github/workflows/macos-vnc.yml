@@ -15,22 +15,26 @@ jobs:
       
       - name: Setup VNC Server
         run: |
-          # Enable screen sharing (VNC)
+          # Set VNC password
+          VNC_PASSWORD="Dilip@2026"
+          
+          # Enable screen sharing via System Settings
+          echo "Enabling screen sharing..."
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -configure -allowAccessFor -allUsers \
             -configure -restart -agent -privs -all
           
-          # Set VNC password
-          echo "Setting VNC password..."
-          VNC_PASSWORD="Dilip@2026"
-          echo "$VNC_PASSWORD" | sudo -S /usr/bin/dscl . -passwd /Users/runner "$VNC_PASSWORD"
+          # Configure VNC password using different method
+          echo "Configuring VNC password..."
+          sudo /usr/bin/dscl . -passwd /Users/runner "$VNC_PASSWORD" 2>/dev/null || true
           
-          # Enable VNC
-          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+          # Alternative: Use system preferences to enable VNC
+          sudo defaults write /Library/Preferences/com.apple.RemoteManagement ARD_AllLocalUsers -bool true
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart -restart -agent
           
-          echo "VNC Password: $VNC_PASSWORD"
+          echo "VNC Server Started"
+          echo "Password: $VNC_PASSWORD"
       
       - name: Install ngrok
         run: |
