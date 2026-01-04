@@ -1,0 +1,101 @@
+name: macOS VNC Access
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  macos-vnc:
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup VNC Server
+        run: |
+          # Enable screen sharing (VNC)
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -configure -allowAccessFor -allUsers \
+            -configure -restart -agent -privs -all
+          
+          # Set VNC password
+          echo "Setting VNC password..."
+          VNC_PASSWORD="Dilip@2026"
+          echo "$VNC_PASSWORD" | sudo -S /usr/bin/dscl . -passwd /Users/runner "$VNC_PASSWORD"
+          
+          # Enable VNC
+          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist com.apple.screensharing -dict Disabled -bool false
+          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+          
+          echo "VNC Password: $VNC_PASSWORD"
+      
+      - name: Install ngrok
+        run: |
+          brew install --cask ngrok
+      
+      - name: Setup ngrok authtoken
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+        run: |
+          if [ -z "$NGROK_AUTH_TOKEN" ]; then
+            echo "WARNING: No NGROK_AUTH_TOKEN secret set. Using free tier (limited)."
+            echo "Sign up at https://ngrok.com and add token to GitHub secrets"
+          else
+            ngrok authtoken $NGROK_AUTH_TOKEN
+          fi
+      
+      - name: Start ngrok tunnel for VNC
+        run: |
+          # Start ngrok in background for VNC port 5900
+          ngrok tcp 5900 --log=stdout > ngrok.log 2>&1 &
+          
+          # Wait for ngrok to start
+          sleep 10
+          
+          # Get ngrok URL
+          curl -s http://localhost:4040/api/tunnels | tee ngrok-api.json
+          
+          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*' | cut -d'"' -f4 | head -1)
+          
+          echo "============================================"
+          echo "VNC ACCESS DETAILS"
+          echo "============================================"
+          echo "VNC URL: $NGROK_URL"
+          echo "Password: Dilip@2026"
+          echo "Username: runner"
+          echo ""
+          echo "To connect from Windows:"
+          echo "1. Download VNC Viewer: https://www.realvnc.com/download/viewer/"
+          echo "2. Connect to: $NGROK_URL"
+          echo "3. Use password: Dilip@2026"
+          echo "============================================"
+          
+          # Also save to file
+          echo "$NGROK_URL" > vnc-url.txt
+          echo "Dilip@2026" > vnc-password.txt
+      
+      - name: Keep session alive
+        run: |
+          echo "VNC session is active. Connection details above."
+          echo "This session will stay alive for 6 hours (GitHub Actions limit)"
+          echo "Press 'Cancel workflow' button to stop early."
+          echo ""
+          
+          # Keep alive for 6 hours (max GitHub Actions time)
+          for i in {1..360}; do
+            echo "Session active - Minute $i/360"
+            sleep 60
+          done
+      
+      - name: Upload connection details
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vnc-connection-details
+          path: |
+            vnc-url.txt
+            vnc-password.txt
+            ngrok.log
