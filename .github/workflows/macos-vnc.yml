@@ -54,16 +54,40 @@ jobs:
       - name: Start ngrok tunnel for VNC
         run: |
           # Start ngrok in background for VNC port 5900
-          ngrok tcp 5900 --log=stdout > ngrok.log 2>&1 &
+          echo "Starting ngrok tunnel..."
+          nohup ngrok tcp 5900 --log=stdout > ngrok.log 2>&1 &
+          NGROK_PID=$!
+          echo "ngrok PID: $NGROK_PID"
           
-          # Wait for ngrok to start
-          sleep 10
+          # Wait for ngrok to start and retry API calls
+          echo "Waiting for ngrok API to be ready..."
+          for i in {1..30}; do
+            sleep 2
+            if curl -s http://localhost:4040/api/tunnels > /dev/null 2>&1; then
+              echo "ngrok API is ready!"
+              break
+            fi
+            echo "Attempt $i/30 - waiting for ngrok..."
+          done
           
-          # Get ngrok URL
-          curl -s http://localhost:4040/api/tunnels | tee ngrok-api.json
+          # Get ngrok URL with better parsing
+          echo "Fetching tunnel information..."
+          sleep 5
+          TUNNEL_DATA=$(curl -s http://localhost:4040/api/tunnels)
+          echo "Raw tunnel data:"
+          echo "$TUNNEL_DATA" | jq '.' || echo "$TUNNEL_DATA"
           
-          NGROK_URL=$(curl -s http://localhost:4040/api/tunnels | grep -o '"public_url":"[^"]*' | cut -d'"' -f4 | head -1)
+          # Extract the public URL using multiple methods
+          NGROK_URL=$(echo "$TUNNEL_DATA" | jq -r '.tunnels[0].public_url' 2>/dev/null || echo "$TUNNEL_DATA" | grep -o 'tcp://[^"]*' | head -1)
           
+          if [ -z "$NGROK_URL" ]; then
+            echo "ERROR: Failed to get ngrok URL!"
+            echo "ngrok log:"
+            cat ngrok.log
+            exit 1
+          fi
+          
+          echo ""
           echo "============================================"
           echo "VNC ACCESS DETAILS"
           echo "============================================"
@@ -76,10 +100,18 @@ jobs:
           echo "2. Connect to: $NGROK_URL"
           echo "3. Use password: Dilip@2026"
           echo "============================================"
+          echo ""
           
-          # Also save to file
+          # Save to file
           echo "$NGROK_URL" > vnc-url.txt
           echo "Dilip@2026" > vnc-password.txt
+          
+          # Verify ngrok is still running
+          if ps -p $NGROK_PID > /dev/null; then
+            echo "ngrok is running (PID: $NGROK_PID)"
+          else
+            echo "WARNING: ngrok process died!"
+          fi
       
       - name: Keep session alive
         run: |
